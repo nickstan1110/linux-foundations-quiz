@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WGU C851 Linux Foundations - Accurate Quiz</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background-color: #f0f4f8; margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        .quiz-card { background: white; width: 95%; max-width: 750px; padding: 30px; border-radius: 15px; box-shadow: 0 15px 35px rgba(0,0,0,0.1); position: relative; margin: 20px; }
+        .progress-container { width: 100%; height: 8px; background: #e0e0e0; border-radius: 4px; margin-bottom: 20px; overflow: hidden; }
+        .progress-bar { height: 100%; background: #1a5f7a; width: 0%; transition: width 0.3s; }
+        .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .q-count { font-weight: bold; color: #1a5f7a; }
+        .score-pill { background: #1a5f7a; color: white; padding: 4px 12px; border-radius: 20px; font-size: 0.9em; }
+        .question-text { font-size: 1.25em; font-weight: 600; color: #333; margin-bottom: 20px; line-height: 1.5; }
+        .option-item { display: flex; align-items: center; padding: 14px; margin: 10px 0; border: 2px solid #edf2f7; border-radius: 10px; cursor: pointer; transition: 0.2s; }
+        .option-item:hover { border-color: #1a5f7a; background: #f7fafc; }
+        .option-item.selected { border-color: #1a5f7a; background: #ebf8ff; }
+        .selector { width: 18px; height: 18px; border: 2px solid #cbd5e0; margin-right: 15px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+        .circle { border-radius: 50%; } .square { border-radius: 4px; }
+        .selected .selector { background: #1a5f7a; border-color: #1a5f7a; }
+        .selected .selector::after { content: ''; width: 8px; height: 8px; background: white; border-radius: inherit; }
+        .correct { border-color: #48bb78 !important; background: #f0fff4 !important; }
+        .wrong { border-color: #f56565 !important; background: #fff5f5 !important; }
+        .controls { display: flex; justify-content: center; gap: 10px; margin-top: 25px; }
+        button { padding: 10px 25px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .btn-sec { background: #edf2f7; color: #4a5568; }
+        .btn-sec:disabled { opacity: 0.5; }
+        .btn-pri { background: #1a5f7a; color: white; }
+        .btn-pri:hover { background: #134b61; }
+        .feedback { text-align: center; margin-top: 15px; font-weight: bold; min-height: 1.5em; font-size: 1.1em; }
+    </style>
+</head>
+<body>
+<div class="quiz-card">
+    <div class="progress-container"><div id="bar" class="progress-bar"></div></div>
+    <div class="header-row">
+        <span class="q-count" id="count"></span>
+        <span class="score-pill" id="score">Score: 0</span>
+    </div>
+    <div class="question-text" id="q-text"></div>
+    <div id="options"></div>
+    <div class="controls">
+        <button class="btn-sec" onclick="move(-1)" id="prev">Back</button>
+        <button class="btn-pri" onclick="check()" id="submit">Submit</button>
+        <button class="btn-sec" onclick="move(1)" id="next">Next</button>
+    </div>
+    <div class="feedback" id="feed"></div>
+</div>
+<script>
+const data = [
+    { "q": "Which of the following values could be a process ID on Linux?", "o": ["A. /bin/bash", "B. 60b503cd-019e-4300-a7be-922f074ef5ce", "C. /sys/pid/9a14", "D. fff3", "E. 21398"], "a": [4] },
+    { "q": "Which of the following is a protocol used for automatic IP address configuration?", "o": ["A. NFS", "B. LDAP", "C. SMTP", "D. DNS", "E. DHCP"], "a": [4] },
+    { "q": "Which of the following devices represents a hard disk partition?", "o": ["A. /dev/ttyS0", "B. /dev/sata0", "C. /dev/part0", "D. /dev/sda2", "E. /dev/sda/p2"], "a": [3] },
+    { "q": "Which of the following statements regarding Linux hardware drivers is correct?", "o": ["A. Drivers are regular programs which have to be run by the user.", "B. Drivers are not used because the BIOS handles all access.", "C. Drivers are stored on their devices and are copied by the kernel.", "D. Drivers are downloaded from vendor repositories when a device is attached.", "E. Drivers are either compiled into the Linux kernel or loaded as modules."], "a": [4] },
+    { "q": "What can be found in the /proc/ directory?", "o": ["A. One directory per installed program.", "B. One device file per hardware device.", "C. One file per existing user account.", "D. One directory per running process.", "E. One log file per running service."], "a": [3] },
+    { "q": "A new server needs security updates for several years. Which of the following Linux distributions meet these requirements? (Choose two.)", "o": ["A. Ubuntu Linux LTS", "B. Fedora Linux", "C. Debian GNU/Linux Unstable", "D. Ubuntu Linux non-LTS", "E. Red Hat Enterprise Linux"], "a": [0, 4] },
+    { "q": "Which of the following directories must be mounted with read and write access if it resides on its own dedicated file system?", "o": ["A. /opt", "B. /lib", "C. /etc", "D. /var", "E. /usr"], "a": [3] },
+    { "q": "The ownership of the file doku.odt should be changed to owner 'tux'. Which command accomplishes this change?", "o": ["A. chmod u tux doku.odt", "B. newuser doku.odt tux", "C. chown tux doku.odt", "D. transfer tux: doku.odt", "E. passwd doku.odt:tux"], "a": [2] },
+    { "q": "What happens to a file residing outside the home directory when the file owner's account is deleted? (Choose two.)", "o": ["A. The file is moved to /lost+found.", "B. The file is removed from the file system.", "C. The UID of the former owner is shown in listing details.", "D. The user root is set as the new owner.", "E. Ownership and permissions remain unchanged."], "a": [2, 4] },
+    { "q": "Which statements about the directory /etc/skel/ are correct? (Choose two.)", "o": ["A. The personal user settings of root are stored here.", "B. Files are copied to the home directory on system start.", "C. Files are copied to the home directory when the account is created.", "D. It contains a default set of configuration files used by useradd.", "E. It contains the global settings for the Linux system."], "a": [2, 3] },
+    { "q": "What is true about links in a Linux file system?", "o": ["A. A symbolic link can only point to a file and not to a directory.", "B. A hard link can only point to a directory.", "C. When the symbolic link target is moved, the link is updated.", "D. A symbolic link can point to a file on another file system.", "E. Only the root user can create hard links."], "a": [3] },
+    { "q": "Which files are the source of information for the following output? (Choose two.) uid=1000(bob) gid=1000(bob) groups=1000(bob), 10(wheel)", "o": ["A. /etc/id", "B. /etc/passwd", "C. /etc/group", "D. /home/index", "E. /var/db/users"], "a": [1, 2] },
+    { "q": "Which of the following tasks can the command passwd accomplish? (Choose two.)", "o": ["A. Change a user's username.", "B. Change a user's password.", "C. Create a new user account.", "D. Create a new user group.", "E. Lock a user account."], "a": [1, 4] },
+    { "q": "What is true about the su command?", "o": ["A. It is the default shell of the root account.", "B. It can only be used by the user root.", "C. It runs a shell or command as another user.", "D. It changes the name of the main administrator account.", "E. It locks the root account in specific time frames."], "a": [2] },
+    { "q": "FILL BLANK - What parameter of ls prints a recursive listing of a directory's content?", "o": ["A. ls -r", "B. ls -R", "C. ls --rec", "D. ls -a", "E. ls -l"], "a": [1] },
+    { "q": "Most commands can display information on their usage. How can this information typically be displayed?", "o": ["A. By running the command with the option /?.", "B. By running the command with the option ?!.", "C. By running the command with the option /doc.", "D. By running the command with the option -h or --help.", "E. By running the command with the option -m."], "a": [3] },
+    { "q": "Which of the following commands shows the absolute path to the current working directory?", "o": ["A. who", "B. cd ..", "C. pwd", "D. ls -1", "E. cd -/home"], "a": [2] },
+    { "q": "Which of the following commands output the content of the file 'Texts 2.txt'? (Choose two.)", "o": ["A. cat 'Texts 2.txt'", "B. cat-Texts 2.txt", "C. cat ITexts 2.txtl", "D. cat 'Texts\\2txt'", "E. cat Texts\\ 2.txt"], "a": [0, 4] },
+    { "q": "Which command displays file names only and no additional information?", "o": ["A. ls -a", "B. ls -lh", "C. ls -l", "D. ls -alh", "E. ls -nl"], "a": [0] },
+    { "q": "What is the purpose of the PATH environment variable?", "o": ["A. It allows execution of commands without the location of the executable.", "B. It increases security by preventing commands from running in certain locations.", "C. It specifies the location of a user's home directory.", "D. It indicates the location of the default shell.", "E. It contains the absolute path to the current directory."], "a": [0] },
+    { "q": "Which of the following commands sets the variable USERNAME to the value 'bob'?", "o": ["A. set USERNAME bob", "B. $USERNAME=-bob", "C. var USERNAME bob", "D. USERNAME<=bob", "E. USERNAME=bob"], "a": [4] },
+    { "q": "FILL BLANK - What command displays manual pages?", "o": ["A. HELP", "B. INFO", "C. MAN", "D. DOC", "E. CAT"], "a": [2] },
+    { "q": "Which command copies the contents of the directory /etc/, including all sub-directories, to /root/?", "o": ["A. copy /etc /root", "B. cp -r /etc/* /root", "C. cp -v /etc /root", "D. rcp /etc /root", "E. cp -R /etc/ /root"], "a": [1] },
+    { "q": "Which of the following commands puts the lines of the file data.csv into alphabetical order?", "o": ["A. a..z data.csv", "B. sort data.csv", "C. abc data.csv", "D. wc -s data.csv", "E. grep -sort data.csv"], "a": [1] },
+    { "q": "Which of the following examples shows the general structure of a for loop in a shell script?", "o": ["A. for txt as file => echo $file", "B. for .txt (echo $i)", "C. for file in *.txt; do echo $file; done", "D. for ls .txt exec {} \\;", "E. foreach @{file} { echo $i}"], "a": [2] },
+    { "q": "Which operator in a regular expression matches the preceding character either zero or one time?", "o": ["A. ?", "B. *", "C. +", "D. %", "E. $"], "a": [1] },
+    { "q": "The file script.sh in the current directory contains the following content:#!/bin/bashecho $MYVARThe following commands are used to execute this script:MYVAR=value -./script.shThe result is an empty line instead of the content of the variable MYVAR. How should MYVAR be set in order to make script.sh display the content of MYVAR?", "o": ["A. !MYVAR value", "B. env MYVAR value", "C. MYVAR=value", "D. $MYVAR value", "E. export MYVAR=value"], "a": [4] },
+    { "q": "What is the return value of a shell script after successful execution?", "o": ["A. 1", "B. 0", "C. -1", "D. -255", "E. 255"], "a": [1] },
+    { "q": "Which of the following commands creates the ZIP archive poems.zip containing all files ending in .txt?", "o": ["A. zip .txt > poems.zip", "B. zcat txt poems.zip", "C. zip poems.zip *.txt", "D. zip cfz poems.zip *.txt", "E. cat .txt | zip poems.zip"], "a": [2] },
+    { "q": "Which of the following statements are true regarding a typical shell script? (Choose two.)", "o": ["A. It has the executable permission bit set.", "B. It starts with the sequence #!", "C. It is located in /usr/local/scripts/.", "D. It is located in /etc/bash/scripts/.", "E. It is compiled into a binary file."], "a": [0, 1] },
+    { "q": "Which of the following commands extracts the contents of the compressed archive file1.tar.gz?", "o": ["A. tar -czf file1.tar.gz", "B. ztar file1.tar.gz", "C. tar -xzf file1.tar.gz", "D. tar --extract file1.tar.gz", "E. detar file1.tar.gz"], "a": [2] },
+    { "q": "Which of the following finds all lines in operating-systems.txt which contain 'linux', regardless of case?", "o": ["A. igrep linux operating-systems.txt", "B. less -i linux operating-systems.txt", "C. grep -i linux operating-systems.txt", "D. cut linux operating-systems.txt", "E. cut [LI] [li] [Nn] [Uu] [Xx]"], "a": [2] },
+    { "q": "Which one of the following statements concerning Linux passwords is true?", "o": ["A. All passwords can be decrypted using the system administrator's master password.", "B. Passwords may never start with a non-letter.", "C. Users cannot change their password once it has been set.", "D. Passwords are only stored in hashed form.", "E. Passwords may be at most six characters long."], "a": [3] },
+    { "q": "Which of the following Linux Distributions is derived from Red Hat Enterprise Linux?", "o": ["A. Raspbian", "B. openSUSE", "C. Debian", "D. Ubuntu", "E. CentOS"], "a": [4] },
+    { "q": "Which of the following statements is true about Free Software?", "o": ["A. It is developed by volunteers only.", "B. It may be modified by anyone using it.", "C. It must always be available free of charge.", "D. It only runs on Linux.", "E. It is only distributed as a compiled binary."], "a": [1] },
+    { "q": "How is a new Linux computing instance provisioned in an IaaS cloud?", "o": ["A. Standard Linux installer run through a remote console.", "B. Distribution vendor delivers it to a cloud instance.", "C. Installation prepared in local VM then copied to cloud.", "D. Cloud host provides a set of pre-prepared images.", "E. Provider-specific configuration file is uploaded."], "a": [3] },
+    { "q": "What are the differences between a private web browser window and a regular window? (Choose three.)", "o": ["A. Private windows do not allow printing.", "B. Private windows do not store cookies persistently.", "C. Private windows do not support logins.", "D. Private windows do not keep records in browser history.", "E. Private windows do not send regular stored cookies."], "a": [1, 3, 4] },
+    { "q": "What is the preferred source for the installation of new applications in a Linux based operating system?", "o": ["A. Vendor's version management system", "B. A CD-ROM disk", "C. The distribution's package repository", "D. The vendor's website", "E. A retail store"], "a": [2] },
+    { "q": "What information is stored in /etc/passwd? (Choose three.)", "o": ["A. The user's storage space limit", "B. The numerical user ID", "C. The username", "D. The encrypted password", "E. The user's default shell"], "a": [1, 2, 4] },
+    { "q": "Which tar options handle compression? (Choose two.)", "o": ["A. -bz", "B. -z", "C. -g", "D. -j", "E. -z2"], "a": [1, 3] },
+];
+
+let cur = 0, score = 0;
+let userAns = new Array(data.length).fill(null);
+let done = new Set();
+
+function load() {
+    const q = data[cur];
+    document.getElementById('bar').style.width = ((cur+1)/data.length*100)+'%';
+    document.getElementById('count').innerText = 'Question '+(cur+1)+' / '+data.length;
+    document.getElementById('q-text').innerText = q.q;
+    document.getElementById('feed').innerText = '';
+    const optDiv = document.getElementById('options');
+    optDiv.innerHTML = '';
+    const multi = q.a.length > 1;
+    q.o.forEach((o, i) => {
+        const div = document.createElement('div');
+        div.className = 'option-item' + (userAns[cur]?.includes(i) ? ' selected' : '');
+        div.innerHTML = `<div class="selector ${multi?'square':'circle'}"></div><span>${o}</span>`;
+        div.onclick = () => {
+            if(done.has(cur)) return;
+            if(!multi) { userAns[cur] = [i]; document.querySelectorAll('.option-item').forEach(e=>e.classList.remove('selected')); div.classList.add('selected'); }
+            else {
+                if(!userAns[cur]) userAns[cur] = [];
+                const idx = userAns[cur].indexOf(i);
+                if(idx>-1) userAns[cur].splice(idx,1); else userAns[cur].push(i);
+                div.classList.toggle('selected');
+            }
+        };
+        optDiv.appendChild(div);
+    });
+    document.getElementById('prev').disabled = cur === 0;
+    document.getElementById('next').disabled = cur === data.length-1;
+    if(done.has(cur)) show();
+}
+function check() {
+    if(!userAns[cur] || userAns[cur].length===0) return;
+    done.add(cur);
+    const correct = JSON.stringify(userAns[cur].sort()) === JSON.stringify(data[cur].a.sort());
+    if(correct) score++;
+    document.getElementById('score').innerText = 'Score: '+score;
+    show();
+}
+function show() {
+    const q = data[cur];
+    const feed = document.getElementById('feed');
+    const correct = JSON.stringify((userAns[cur]||[]).sort()) === JSON.stringify(q.a.sort());
+    feed.innerText = correct ? '✨ Correct!' : '❌ Incorrect';
+    feed.style.color = correct ? '#48bb78' : '#f56565';
+    document.querySelectorAll('.option-item').forEach((d, i) => {
+        d.classList.remove('selected');
+        if(q.a.includes(i)) d.classList.add('correct');
+        else if(userAns[cur]?.includes(i)) d.classList.add('wrong');
+    });
+}
+function move(s) { cur+=s; load(); }
+load();
+</script>
+</body>
+</html>
